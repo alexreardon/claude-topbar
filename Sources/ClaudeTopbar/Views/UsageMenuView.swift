@@ -12,8 +12,13 @@ struct UsageMenuView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Claude Usage")
-                .font(.headline)
+            HStack(spacing: 6) {
+                ClaudeLogo()
+                    .fill(Color(red: 0xD9/255.0, green: 0x77/255.0, blue: 0x57/255.0))
+                    .frame(width: 16, height: 16)
+                Text("Claude Usage")
+                    .font(.headline)
+            }
 
             if needsSignIn {
                 signInSection
@@ -42,20 +47,28 @@ struct UsageMenuView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 12) {
+            HStack {
                 if !needsSignIn {
-                    Button("Refresh") {
-                        Task { await poller.pollNow() }
+                    Button { Task { await poller.pollNow() } } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
                     .disabled(poller.isLoading)
+                    .help("Refresh")
                 }
 
-                Button("Settings...") {
+                Button {
                     openSettings()
                     NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "gearshape")
                 }
+                .help("Settings")
 
                 Spacer()
+
+                Button("Usage Page") {
+                    NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!)
+                }
 
                 Button("Quit") {
                     NSApp.terminate(nil)
@@ -91,33 +104,38 @@ struct UsageMenuView: View {
     private func usageSection(_ usage: UsageResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let bucket = usage.fiveHour {
-                usageLine(label: "Session (5h)", bucket: bucket)
+                usageLine(label: "Session (5h)", bucket: bucket, windowHours: 5)
             }
             if let bucket = usage.sevenDay {
-                usageLine(label: "Weekly (7d)", bucket: bucket)
+                usageLine(label: "Weekly (7d)", bucket: bucket, windowHours: 7 * 24)
             }
             if let bucket = usage.sevenDayOpus {
-                usageLine(label: "Opus (7d)", bucket: bucket)
+                usageLine(label: "Opus (7d)", bucket: bucket, windowHours: 7 * 24)
             }
             if let bucket = usage.sevenDaySonnet {
-                usageLine(label: "Sonnet (7d)", bucket: bucket)
+                usageLine(label: "Sonnet (7d)", bucket: bucket, windowHours: 7 * 24)
             }
         }
     }
 
-    private func usageLine(label: String, bucket: UsageBucket) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func usageLine(label: String, bucket: UsageBucket, windowHours: Double) -> some View {
+        let wp = windowProgress(for: bucket, windowHours: windowHours)
+        let color = usageColor(fraction: bucket.fraction, percentage: bucket.percentage, windowProgress: wp)
+        return VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text(label)
                     .font(.system(.body, weight: .medium))
                 Spacer()
                 Text("\(bucket.percentage)%")
                     .font(.system(.body, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(colorForPercentage(bucket.percentage))
+                    .foregroundStyle(color)
             }
 
-            ProgressView(value: bucket.fraction)
-                .tint(colorForPercentage(bucket.percentage))
+            UsageBar(
+                fraction: bucket.fraction,
+                windowProgress: wp,
+                tint: color
+            )
 
             if let resetsAt = bucket.resetsAtDate {
                 Text("Resets \(resetsAt, style: .relative)")
@@ -125,6 +143,16 @@ struct UsageMenuView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func windowProgress(for bucket: UsageBucket, windowHours: Double) -> Double {
+        guard let resetsAt = bucket.resetsAtDate else { return 0 }
+        let windowDuration = windowHours * 3600
+        let windowStart = resetsAt.addingTimeInterval(-windowDuration)
+        let now = Date()
+        guard now >= windowStart else { return 0 }
+        guard now < resetsAt else { return 1 }
+        return now.timeIntervalSince(windowStart) / windowDuration
     }
 
     @ViewBuilder
@@ -140,9 +168,40 @@ struct UsageMenuView: View {
         .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
-    private func colorForPercentage(_ pct: Int) -> Color {
-        if pct >= 95 { return .red }
-        if pct >= 80 { return .orange }
-        return .blue
+    private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
+        if percentage >= 95 { return .red }
+        if percentage >= 80 { return .orange }
+        if fraction < windowProgress { return .green }
+        return .orange
+    }
+}
+
+private struct UsageBar: View {
+    let fraction: Double
+    let windowProgress: Double
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                // Track
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(.gray.opacity(0.2))
+
+                // Fill
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(tint)
+                    .frame(width: geo.size.width * CGFloat(min(fraction, 1.0)))
+
+                // Tick marker
+                if windowProgress > 0 && windowProgress < 1 {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(.white)
+                        .frame(width: 2.5)
+                        .offset(x: geo.size.width * CGFloat(windowProgress) - 1.25)
+                }
+            }
+        }
+        .frame(height: 6)
     }
 }
