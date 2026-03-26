@@ -1,5 +1,6 @@
 # Claude Topbar
 
+> [!NOTE]
 > This project was built entirely with [Claude Code](https://claude.ai/code).
 
 A macOS menu bar app that shows your Claude session usage without needing to open the browser.
