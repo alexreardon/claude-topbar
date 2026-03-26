@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "*",
+      "Bash(sw_vers)",
+      "Bash(swift:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(xcode-select:*)",
+      "WebFetch(domain:claude.ai)",
+      "WebFetch(domain:support.anthropic.com)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch",
+      "Bash",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -f:*)",
+      "Bash(git checkout -- .:*)",
+      "Bash(git branch -D:*)"
+    ]
+  }
+}
