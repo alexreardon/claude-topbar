@@ -82,16 +82,13 @@ struct WebLoginWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
-            // After each navigation, check cookies
             if !foundKey {
                 Task { @MainActor in
-                    // Small delay to let cookies settle after redirect
                     try? await Task.sleep(for: .milliseconds(500))
-                    self.checkForSessionKey(in: navigationAction.request.mainDocumentURL != nil ? webView : webView)
+                    self.checkForSessionKey(in: webView)
                 }
             }
             return .allow
-
         }
 
         private func checkForSessionKey(in webView: WKWebView) {

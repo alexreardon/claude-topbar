@@ -7,7 +7,6 @@ struct SettingsView: View {
     @State private var sessionKeyInput: String = ""
     @State private var saveState: SaveState = .idle
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismiss) private var dismiss
 
     private enum SaveState {
         case idle, saved, error(String)
@@ -162,7 +161,7 @@ struct SettingsView: View {
                 if case .saved = saveState { saveState = .idle }
             }
         } catch {
-            saveState = .error("Failed to save to Keychain")
+            saveState = .error("Failed to save session key")
         }
     }
 }

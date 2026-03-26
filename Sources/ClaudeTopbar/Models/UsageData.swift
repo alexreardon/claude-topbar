@@ -48,6 +48,17 @@ struct UsageBucket: Codable, Sendable {
     var fraction: Double {
         min(utilization / 100.0, 1.0)
     }
+
+    /// How far through the time window we are (0.0 to 1.0)
+    func windowProgress(windowHours: Double) -> Double {
+        guard let resetsAt = resetsAtDate else { return 0 }
+        let windowDuration = windowHours * 3600
+        let windowStart = resetsAt.addingTimeInterval(-windowDuration)
+        let now = Date()
+        guard now >= windowStart else { return 0 }
+        guard now < resetsAt else { return 1 }
+        return now.timeIntervalSince(windowStart) / windowDuration
+    }
 }
 
 struct Organization: Codable, Sendable {

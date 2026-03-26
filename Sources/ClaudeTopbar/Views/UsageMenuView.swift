@@ -14,7 +14,7 @@ struct UsageMenuView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 ClaudeLogo()
-                    .fill(Color(red: 0xD9/255.0, green: 0x77/255.0, blue: 0x57/255.0))
+                    .fill(ClaudeLogo.terracotta)
                     .frame(width: 16, height: 16)
                 Text("Claude usage")
                     .font(.headline)
@@ -119,7 +119,7 @@ struct UsageMenuView: View {
     }
 
     private func usageLine(label: String, bucket: UsageBucket, windowHours: Double) -> some View {
-        let wp = windowProgress(for: bucket, windowHours: windowHours)
+        let wp = bucket.windowProgress(windowHours: windowHours)
         let color = usageColor(fraction: bucket.fraction, percentage: bucket.percentage, windowProgress: wp)
         return VStack(alignment: .leading, spacing: 3) {
             HStack {
@@ -143,16 +143,6 @@ struct UsageMenuView: View {
                     .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private func windowProgress(for bucket: UsageBucket, windowHours: Double) -> Double {
-        guard let resetsAt = bucket.resetsAtDate else { return 0 }
-        let windowDuration = windowHours * 3600
-        let windowStart = resetsAt.addingTimeInterval(-windowDuration)
-        let now = Date()
-        guard now >= windowStart else { return 0 }
-        guard now < resetsAt else { return 1 }
-        return now.timeIntervalSince(windowStart) / windowDuration
     }
 
     @ViewBuilder

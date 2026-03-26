@@ -25,23 +25,11 @@ final class UsagePoller {
         }
     }
 
-    enum StatusLevel {
-        case normal, warning, critical, unknown
-    }
-
     var displayPercentage: Int {
         guard let usage else { return 0 }
         let session = usage.fiveHour?.percentage ?? 0
         let weekly = usage.sevenDay?.percentage ?? 0
         return max(session, weekly)
-    }
-
-    var statusLevel: StatusLevel {
-        guard usage != nil else { return .unknown }
-        let pct = displayPercentage
-        if pct >= 95 { return .critical }
-        if pct >= 80 { return .warning }
-        return .normal
     }
 
     /// Normalized 0.0-1.0 for the menu bar progress bar
@@ -55,17 +43,7 @@ final class UsagePoller {
 
     /// How far through the 5h window we are (0.0 to 1.0)
     var windowProgress: Double {
-        guard let resetsAt = sessionResetsAt else { return 0 }
-        let windowDuration: TimeInterval = 5 * 60 * 60
-        let windowStart = resetsAt.addingTimeInterval(-windowDuration)
-        let now = Date()
-        guard now >= windowStart else { return 0 }
-        guard now < resetsAt else { return 1 }
-        return now.timeIntervalSince(windowStart) / windowDuration
-    }
-
-    var hasSessionKey: Bool {
-        KeychainService.load() != nil
+        usage?.fiveHour?.windowProgress(windowHours: 5) ?? 0
     }
 
     func start() {
