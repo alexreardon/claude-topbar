@@ -1,8 +1,12 @@
 # Claude Topbar
 
-A macOS menu bar app that shows your Claude usage at a glance.
+**Stop refreshing the usage page. Start vibing.**
 
-Built for Claude Max plan users who want to see how much of their session limit they've used without opening the browser.
+Claude Topbar lives in your macOS menu bar and gives you a real-time view of your Claude session usage — so you can pace yourself through conversations without nervously checking the settings page every five minutes.
+
+The usage bar shows how much you've consumed. The tick marker shows how far through the 5-hour window you are. If the bar is behind the tick, you're golden. If it's ahead, maybe let Claude finish its thought before asking it to refactor your entire codebase.
+
+Built for Claude Pro and Max plan users.
 
 ## What it looks like
 
