@@ -16,14 +16,8 @@ struct MenuBarLabel: View {
         HStack(spacing: 4) {
             Image(nsImage: renderCombinedImage())
                 .renderingMode(.original)
-            if poller.usage != nil {
-                Text(timeRemainingLabel)
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-            } else if poller.error != nil {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 11))
-            } else {
-                Text("--")
+            if poller.showTimeInMenuBar, poller.usage != nil, let label = timeRemainingLabel {
+                Text(label)
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
             }
         }
@@ -31,8 +25,8 @@ struct MenuBarLabel: View {
         .onDisappear { stopTickTimer() }
     }
 
-    private var timeRemainingLabel: String {
-        guard let resetsAt = poller.sessionResetsAt else { return "--" }
+    private var timeRemainingLabel: String? {
+        guard let resetsAt = poller.sessionResetsAt else { return nil }
         let remaining = resetsAt.timeIntervalSinceNow
         guard remaining > 0 else { return "0m" }
         let hours = Int(remaining) / 3600

@@ -9,6 +9,11 @@ final class UsagePoller {
     var isLoading: Bool = false
     var lastUpdated: Date?
 
+    var showTimeInMenuBar: Bool {
+        get { UserDefaults.standard.bool(forKey: "showTimeInMenuBar") }
+        set { UserDefaults.standard.set(newValue, forKey: "showTimeInMenuBar") }
+    }
+
     private var pollTimer: Timer?
     private var cachedOrgId: String?
     private let pollInterval: TimeInterval = 60

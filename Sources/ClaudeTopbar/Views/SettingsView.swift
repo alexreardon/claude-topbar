@@ -23,6 +23,8 @@ struct SettingsView: View {
 
             if isSignedIn {
                 signedInSection
+                Divider()
+                displaySection
             } else {
                 signedOutSection
             }
@@ -53,6 +55,11 @@ struct SettingsView: View {
                 saveState = .idle
             }
         }
+    }
+
+    @ViewBuilder
+    private var displaySection: some View {
+        Toggle("Show time remaining in menu bar", isOn: Bindable(poller).showTimeInMenuBar)
     }
 
     @ViewBuilder
