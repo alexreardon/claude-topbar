@@ -1,23 +1,12 @@
 # Claude Topbar
 
-**Stop refreshing the usage page. Start vibing.**
+A macOS menu bar app that shows your Claude session usage without needing to open the browser.
 
-Claude Topbar lives in your macOS menu bar and gives you a real-time view of your Claude session usage — so you can pace yourself through conversations without nervously checking the settings page every five minutes.
+Displays a usage bar, a tick marker for your position in the 5-hour session window, and the time remaining until reset. Click for a full breakdown of session, weekly, and per-model usage.
 
-The usage bar shows how much you've consumed. The tick marker shows how far through the 5-hour window you are. If the bar is behind the tick, you're golden. If it's ahead, maybe let Claude finish its thought before asking it to refactor your entire codebase.
+The bar is **green** when usage is below your time position, **orange** when above, and **red** past 95%.
 
-Built for Claude Pro and Max plan users.
-
-## What it looks like
-
-The menu bar shows:
-- The Claude logo in terracotta
-- A usage bar with a tick marker showing your position in the 5-hour session window
-- Time remaining until the session resets
-
-Click the menu bar item for a detailed breakdown of session, weekly, and per-model usage.
-
-The bar turns **green** when you're under-pacing the clock, **orange** when you're over-pacing, and **red** above 95%.
+For Claude Pro and Max plan users.
 
 ## Requirements
 
