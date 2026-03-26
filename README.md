@@ -1,5 +1,7 @@
 # Claude Topbar
 
+> This project was built entirely with [Claude Code](https://claude.ai/code).
+
 A macOS menu bar app that shows your Claude session usage without needing to open the browser.
 
 Displays a usage bar, a tick marker for your position in the 5-hour session window, and the time remaining until reset. Click for a full breakdown of session, weekly, and per-model usage.
