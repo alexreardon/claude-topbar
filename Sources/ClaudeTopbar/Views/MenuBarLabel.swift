@@ -43,10 +43,11 @@ struct MenuBarLabel: View {
         tickTimer = nil
     }
 
-    private func usageColor(for percentage: Int) -> NSColor {
+    private func usageColor(fraction: Double, percentage: Int) -> NSColor {
         if percentage >= 95 { return .systemRed }
         if percentage >= 80 { return .systemOrange }
-        return .systemBlue
+        if fraction < currentWindowProgress { return .systemGreen }
+        return .systemOrange
     }
 
     private func renderBarImage() -> NSImage {
@@ -92,7 +93,7 @@ struct MenuBarLabel: View {
             ctx.saveGState()
             ctx.addPath(trackPath)
             ctx.clip()
-            ctx.setFillColor(usageColor(for: poller.displayPercentage).cgColor)
+            ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
             ctx.fill(fillRect)
             ctx.restoreGState()
         }

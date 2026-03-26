@@ -3,24 +3,34 @@ import SwiftUI
 struct UsageMenuView: View {
     let poller: UsagePoller
     let openSettings: () -> Void
+    let openLogin: () -> Void
+
+    private var needsSignIn: Bool {
+        if case .noSessionKey = poller.error { return true }
+        return false
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Claude Usage")
                 .font(.headline)
 
-            if let error = poller.error {
-                errorSection(error)
-            }
+            if needsSignIn {
+                signInSection
+            } else {
+                if let error = poller.error {
+                    errorSection(error)
+                }
 
-            if let usage = poller.usage {
-                usageSection(usage)
-            } else if poller.error == nil {
-                HStack {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading...")
-                        .foregroundStyle(.secondary)
+                if let usage = poller.usage {
+                    usageSection(usage)
+                } else if poller.error == nil {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading...")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -33,10 +43,12 @@ struct UsageMenuView: View {
             }
 
             HStack(spacing: 12) {
-                Button("Refresh") {
-                    Task { await poller.pollNow() }
+                if !needsSignIn {
+                    Button("Refresh") {
+                        Task { await poller.pollNow() }
+                    }
+                    .disabled(poller.isLoading)
                 }
-                .disabled(poller.isLoading)
 
                 Button("Settings...") {
                     openSettings()
@@ -58,6 +70,21 @@ struct UsageMenuView: View {
                 await poller.pollNow()
             }
         }
+    }
+
+    @ViewBuilder
+    private var signInSection: some View {
+        VStack(spacing: 8) {
+            Text("Sign in to see your usage")
+                .foregroundStyle(.secondary)
+            Button("Sign in with Claude...") {
+                openLogin()
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
