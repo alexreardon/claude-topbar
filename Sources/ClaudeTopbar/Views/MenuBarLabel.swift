@@ -13,7 +13,7 @@ struct MenuBarLabel: View {
     private let cornerRadius: CGFloat = 2
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 0) {
             Image(nsImage: renderCombinedImage())
                 .renderingMode(.original)
             if poller.showTimeInMenuBar, poller.usage != nil, let label = timeRemainingLabel {
@@ -62,7 +62,8 @@ struct MenuBarLabel: View {
     /// Renders the Claude logo + usage bar as a single NSImage
     private func renderCombinedImage() -> NSImage {
         let scale: CGFloat = 2
-        let totalWidth = logoSize + gap + barWidth
+        let trailingPad: CGFloat = 4
+        let totalWidth = logoSize + gap + barWidth + trailingPad
         let totalHeight = logoSize
         let pw = totalWidth * scale
         let ph = totalHeight * scale

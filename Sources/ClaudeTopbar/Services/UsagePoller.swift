@@ -9,9 +9,8 @@ final class UsagePoller {
     var isLoading: Bool = false
     var lastUpdated: Date?
 
-    var showTimeInMenuBar: Bool {
-        get { UserDefaults.standard.bool(forKey: "showTimeInMenuBar") }
-        set { UserDefaults.standard.set(newValue, forKey: "showTimeInMenuBar") }
+    var showTimeInMenuBar: Bool = UserDefaults.standard.bool(forKey: "showTimeInMenuBar") {
+        didSet { UserDefaults.standard.set(showTimeInMenuBar, forKey: "showTimeInMenuBar") }
     }
 
     private var pollTimer: Timer?
