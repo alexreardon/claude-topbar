@@ -22,8 +22,8 @@ For Claude Pro and Max plan users.
 ### From source
 
 ```bash
-git clone https://github.com/alexreardon/claude-usage-topbar-macos.git
-cd claude-usage-topbar-macos
+git clone https://github.com/alexreardon/claude-topbar.git
+cd claude-topbar
 make install
 ```
 
