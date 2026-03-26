@@ -113,6 +113,12 @@ struct MenuBarLabel: View {
             ctx.addPath(trackPath)
             ctx.fillPath()
 
+            // Outline
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.3).cgColor)
+            ctx.setLineWidth(1 * scale)
+            ctx.addPath(trackPath)
+            ctx.strokePath()
+
             // Usage fill
             let fraction = poller.sessionFraction
             if fraction > 0 {
