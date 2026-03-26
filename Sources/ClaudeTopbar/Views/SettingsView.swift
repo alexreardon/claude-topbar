@@ -33,6 +33,23 @@ struct SettingsView: View {
             if showManualEntry {
                 manualEntrySection
             }
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Text("Made by ")
+                    .foregroundStyle(.tertiary)
+                +
+                Text("Alex Reardon")
+                    .foregroundStyle(.tertiary)
+                    .underline()
+                Spacer()
+            }
+            .font(.caption)
+            .onTapGesture {
+                NSWorkspace.shared.open(URL(string: "https://x.com/alexandereardon")!)
+            }
         }
         .padding(20)
         .frame(width: 460)
@@ -46,7 +63,7 @@ struct SettingsView: View {
             Text("Signed in")
                 .font(.subheadline)
             Spacer()
-            Button("Sign Out") {
+            Button("Sign out") {
                 KeychainService.delete()
                 sessionKeyInput = ""
                 showManualEntry = false
@@ -101,7 +118,7 @@ struct SettingsView: View {
         Divider()
 
         VStack(alignment: .leading, spacing: 6) {
-            Text("Session Key")
+            Text("Session key")
                 .font(.subheadline.weight(.medium))
 
             SecureField("sk-ant-sid01-...", text: $sessionKeyInput)

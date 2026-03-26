@@ -16,7 +16,7 @@ struct UsageMenuView: View {
                 ClaudeLogo()
                     .fill(Color(red: 0xD9/255.0, green: 0x77/255.0, blue: 0x57/255.0))
                     .frame(width: 16, height: 16)
-                Text("Claude Usage")
+                Text("Claude usage")
                     .font(.headline)
             }
 
@@ -66,7 +66,7 @@ struct UsageMenuView: View {
 
                 Spacer()
 
-                Button("Usage Page") {
+                Button("Usage page") {
                     NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!)
                 }
 
@@ -126,7 +126,7 @@ struct UsageMenuView: View {
                 Text(label)
                     .font(.system(.body, weight: .medium))
                 Spacer()
-                Text("\(bucket.percentage)%")
+                Text("\(bucket.percentage)% used")
                     .font(.system(.body, weight: .semibold).monospacedDigit())
                     .foregroundStyle(color)
             }

@@ -4,7 +4,7 @@ import AppKit
 struct MenuBarLabel: View {
     let poller: UsagePoller
     @State private var tickTimer: Timer?
-    @State private var currentWindowProgress: Double = 0
+    @State private var currentWindowProgress: Double?
 
     private let logoSize: CGFloat = 14
     private let barWidth: CGFloat = 40
@@ -38,10 +38,10 @@ struct MenuBarLabel: View {
     }
 
     private func startTickTimer() {
-        currentWindowProgress = poller.windowProgress
+        if poller.usage != nil { currentWindowProgress = poller.windowProgress }
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
-                currentWindowProgress = poller.windowProgress
+                if poller.usage != nil { currentWindowProgress = poller.windowProgress }
             }
         }
     }
@@ -54,7 +54,8 @@ struct MenuBarLabel: View {
     private func usageColor(fraction: Double, percentage: Int) -> NSColor {
         if percentage >= 95 { return .systemRed }
         if percentage >= 80 { return .systemOrange }
-        if fraction < currentWindowProgress { return .systemGreen }
+        let wp = currentWindowProgress ?? poller.windowProgress
+        if fraction < wp { return .systemGreen }
         return .systemOrange
     }
 
@@ -95,46 +96,48 @@ struct MenuBarLabel: View {
         ctx.fillPath()
         ctx.restoreGState()
 
-        // --- Draw usage bar ---
-        let barX = (logoSize + gap) * scale
-        let bw = barWidth * scale
-        let bh = barHeight * scale
-        let barY = (totalHeight - barHeight) / 2 * scale  // vertically center
-        let cr = cornerRadius * scale
+        // --- Draw usage bar (only when data is available) ---
+        if poller.usage != nil {
+            let barX = (logoSize + gap) * scale
+            let bw = barWidth * scale
+            let bh = barHeight * scale
+            let barY = (totalHeight - barHeight) / 2 * scale  // vertically center
+            let cr = cornerRadius * scale
 
-        ctx.saveGState()
-        ctx.translateBy(x: barX, y: barY)
-
-        // Track background
-        let trackRect = CGRect(x: 0, y: 0, width: bw, height: bh)
-        let trackPath = CGPath(roundedRect: trackRect, cornerWidth: cr, cornerHeight: cr, transform: nil)
-        ctx.setFillColor(NSColor.gray.withAlphaComponent(0.3).cgColor)
-        ctx.addPath(trackPath)
-        ctx.fillPath()
-
-        // Usage fill
-        let fraction = poller.sessionFraction
-        if fraction > 0 {
-            let fillWidth = bw * CGFloat(min(fraction, 1.0))
-            let fillRect = CGRect(x: 0, y: 0, width: fillWidth, height: bh)
             ctx.saveGState()
+            ctx.translateBy(x: barX, y: barY)
+
+            // Track background
+            let trackRect = CGRect(x: 0, y: 0, width: bw, height: bh)
+            let trackPath = CGPath(roundedRect: trackRect, cornerWidth: cr, cornerHeight: cr, transform: nil)
+            ctx.setFillColor(NSColor.gray.withAlphaComponent(0.3).cgColor)
             ctx.addPath(trackPath)
-            ctx.clip()
-            ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
-            ctx.fill(fillRect)
+            ctx.fillPath()
+
+            // Usage fill
+            let fraction = poller.sessionFraction
+            if fraction > 0 {
+                let fillWidth = bw * CGFloat(min(fraction, 1.0))
+                let fillRect = CGRect(x: 0, y: 0, width: fillWidth, height: bh)
+                ctx.saveGState()
+                ctx.addPath(trackPath)
+                ctx.clip()
+                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
+                ctx.fill(fillRect)
+                ctx.restoreGState()
+            }
+
+            // Tick marker for time position
+            let progress = currentWindowProgress ?? poller.windowProgress
+            if progress > 0 && progress < 1 {
+                let tickX = bw * CGFloat(progress)
+                let tickWidth: CGFloat = 2 * scale
+                ctx.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
+                ctx.fill(CGRect(x: tickX - tickWidth / 2, y: 0, width: tickWidth, height: bh))
+            }
+
             ctx.restoreGState()
         }
-
-        // Tick marker for time position
-        let progress = currentWindowProgress
-        if progress > 0 && progress < 1 {
-            let tickX = bw * CGFloat(progress)
-            let tickWidth: CGFloat = 2 * scale
-            ctx.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
-            ctx.fill(CGRect(x: tickX - tickWidth / 2, y: 0, width: tickWidth, height: bh))
-        }
-
-        ctx.restoreGState()
 
         image.unlockFocus()
         image.isTemplate = false
