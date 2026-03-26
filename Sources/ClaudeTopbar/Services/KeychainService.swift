@@ -1,49 +1,28 @@
 import Foundation
-import Security
 
+// TODO: Move session key storage back to macOS Keychain once the app is stable.
+// Currently using a file (~/.claude/topbar-session-key) to avoid repeated Keychain
+// authorization prompts that occur on every rebuild (ad-hoc signing changes the binary hash).
+// The file has 0600 permissions but is readable by any process running as the current user.
 enum KeychainService {
-    private static let service = "com.claudetopbar.session-key"
-    private static let account = "claude-ai-session"
+    private static let configDir = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".claude")
+    private static let credFile = configDir.appendingPathComponent("topbar-session-key")
 
     static func save(sessionKey: String) throws {
-        delete()
-        guard let data = sessionKey.data(using: .utf8) else { return }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-        ]
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveFailed(status)
-        }
+        try FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+        // File permissions: owner read/write only (0600)
+        let data = Data(sessionKey.utf8)
+        FileManager.default.createFile(atPath: credFile.path, contents: data, attributes: [.posixPermissions: 0o600])
     }
 
     static func load() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        guard let data = try? Data(contentsOf: credFile) else { return nil }
+        let key = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return key?.isEmpty == false ? key : nil
     }
 
     static func delete() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
-
-    enum KeychainError: Error {
-        case saveFailed(OSStatus)
+        try? FileManager.default.removeItem(at: credFile)
     }
 }
