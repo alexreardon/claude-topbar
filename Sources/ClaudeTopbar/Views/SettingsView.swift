@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 struct SettingsView: View {
     let poller: UsagePoller
@@ -59,7 +60,22 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var displaySection: some View {
+        Toggle("Start on login", isOn: $startOnLogin)
         Toggle("Show time remaining in menu bar", isOn: Bindable(poller).showTimeInMenuBar)
+    }
+
+    @State private var startOnLogin: Bool = SMAppService.mainApp.status == .enabled {
+        didSet {
+            do {
+                if startOnLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                startOnLogin = !startOnLogin
+            }
+        }
     }
 
     @ViewBuilder
