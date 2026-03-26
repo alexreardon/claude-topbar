@@ -43,10 +43,9 @@ struct MenuBarLabel: View {
         tickTimer = nil
     }
 
-    private func usageColor(for utilization: Double) -> NSColor {
-        let pct = utilization * 100
-        if pct >= 95 { return .systemRed }
-        if pct >= 80 { return .systemOrange }
+    private func usageColor(for percentage: Int) -> NSColor {
+        if percentage >= 95 { return .systemRed }
+        if percentage >= 80 { return .systemOrange }
         return .systemBlue
     }
 
@@ -86,14 +85,14 @@ struct MenuBarLabel: View {
         ctx.fillPath()
 
         // Usage fill
-        let utilization = poller.sessionUtilization
-        if utilization > 0 {
-            let fillWidth = w * CGFloat(min(utilization, 1.0))
+        let fraction = poller.sessionFraction
+        if fraction > 0 {
+            let fillWidth = w * CGFloat(min(fraction, 1.0))
             let fillRect = CGRect(x: 0, y: 0, width: fillWidth, height: h)
             ctx.saveGState()
             ctx.addPath(trackPath)
             ctx.clip()
-            ctx.setFillColor(usageColor(for: utilization).cgColor)
+            ctx.setFillColor(usageColor(for: poller.displayPercentage).cgColor)
             ctx.fill(fillRect)
             ctx.restoreGState()
         }

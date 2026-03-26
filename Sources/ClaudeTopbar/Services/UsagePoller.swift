@@ -39,8 +39,9 @@ final class UsagePoller {
         return .normal
     }
 
-    var sessionUtilization: Double {
-        usage?.fiveHour?.utilization ?? 0
+    /// Normalized 0.0-1.0 for the menu bar progress bar
+    var sessionFraction: Double {
+        usage?.fiveHour?.fraction ?? 0
     }
 
     var sessionResetsAt: Date? {

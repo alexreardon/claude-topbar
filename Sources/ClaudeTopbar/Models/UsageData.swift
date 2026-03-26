@@ -39,8 +39,14 @@ struct UsageBucket: Codable, Sendable {
         Self.isoFormatter.date(from: resetsAt) ?? Self.isoFormatterNoFrac.date(from: resetsAt)
     }
 
+    /// utilization comes from the API as 0-100 (already a percentage)
     var percentage: Int {
-        Int((utilization * 100).rounded())
+        Int(utilization.rounded())
+    }
+
+    /// Normalized to 0.0-1.0 for progress bars
+    var fraction: Double {
+        min(utilization / 100.0, 1.0)
     }
 }
 

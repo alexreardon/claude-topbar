@@ -86,11 +86,11 @@ struct UsageMenuView: View {
                 Spacer()
                 Text("\(bucket.percentage)%")
                     .font(.system(.body, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(colorForUtilization(bucket.utilization))
+                    .foregroundStyle(colorForPercentage(bucket.percentage))
             }
 
-            ProgressView(value: min(bucket.utilization, 1.0))
-                .tint(colorForUtilization(bucket.utilization))
+            ProgressView(value: bucket.fraction)
+                .tint(colorForPercentage(bucket.percentage))
 
             if let resetsAt = bucket.resetsAtDate {
                 Text("Resets \(resetsAt, style: .relative)")
@@ -113,8 +113,7 @@ struct UsageMenuView: View {
         .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
-    private func colorForUtilization(_ utilization: Double) -> Color {
-        let pct = utilization * 100
+    private func colorForPercentage(_ pct: Int) -> Color {
         if pct >= 95 { return .red }
         if pct >= 80 { return .orange }
         return .blue
