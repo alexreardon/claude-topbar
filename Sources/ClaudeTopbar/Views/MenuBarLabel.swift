@@ -128,7 +128,7 @@ struct MenuBarLabel: View {
                 ctx.saveGState()
                 ctx.addPath(trackPath)
                 ctx.clip()
-                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
+                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.usage?.fiveHour?.percentage ?? 0).cgColor)
                 ctx.fill(fillRect)
                 ctx.restoreGState()
             }
