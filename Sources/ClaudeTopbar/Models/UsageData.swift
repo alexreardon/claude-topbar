@@ -16,11 +16,17 @@ struct UsageResponse: Codable, Sendable {
 
 struct UsageBucket: Codable, Sendable {
     let utilization: Double
-    let resetsAt: String
+    let resetsAt: String?
 
     enum CodingKeys: String, CodingKey {
         case utilization
         case resetsAt = "resets_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.utilization = (try? container.decode(Double.self, forKey: .utilization)) ?? 0
+        self.resetsAt = try? container.decode(String.self, forKey: .resetsAt)
     }
 
     private static let isoFormatter: ISO8601DateFormatter = {
@@ -36,7 +42,8 @@ struct UsageBucket: Codable, Sendable {
     }()
 
     var resetsAtDate: Date? {
-        Self.isoFormatter.date(from: resetsAt) ?? Self.isoFormatterNoFrac.date(from: resetsAt)
+        guard let resetsAt else { return nil }
+        return Self.isoFormatter.date(from: resetsAt) ?? Self.isoFormatterNoFrac.date(from: resetsAt)
     }
 
     /// utilization comes from the API as 0-100 (already a percentage)

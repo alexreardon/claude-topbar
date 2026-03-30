@@ -5,17 +5,20 @@ enum ClaudeAPIError: Error, LocalizedError {
     case authFailed
     case rateLimited
     case invalidResponse(Int)
-    case decodingError(Error)
+    case decodingError(Error, body: Data? = nil)
     case networkError(Error)
 
     var errorDescription: String? {
         switch self {
-        case .noSessionKey: "No session key configured"
-        case .authFailed: "Session key expired or invalid"
-        case .rateLimited: "Rate limited — try again shortly"
-        case .invalidResponse(let code): "Server returned HTTP \(code)"
-        case .decodingError(let err): "Failed to parse response: \(err.localizedDescription)"
-        case .networkError(let err): "Network error: \(err.localizedDescription)"
+        case .noSessionKey: return "No session key configured"
+        case .authFailed: return "Session key expired or invalid"
+        case .rateLimited: return "Rate limited — try again shortly"
+        case .invalidResponse(let code): return "Server returned HTTP \(code)"
+        case .decodingError(let err, let body):
+            let preview = body.flatMap { String(data: $0.prefix(200), encoding: .utf8) } ?? ""
+            return "Failed to parse response: \(err.localizedDescription)" +
+                   (preview.isEmpty ? "" : "\n\nResponse preview: \(preview)")
+        case .networkError(let err): return "Network error: \(err.localizedDescription)"
         }
     }
 }
@@ -49,7 +52,7 @@ enum ClaudeAPIService {
         do {
             return try JSONDecoder().decode([Organization].self, from: data)
         } catch {
-            throw ClaudeAPIError.decodingError(error)
+            throw ClaudeAPIError.decodingError(error, body: data)
         }
     }
 
@@ -63,7 +66,7 @@ enum ClaudeAPIService {
         do {
             return try JSONDecoder().decode(UsageResponse.self, from: data)
         } catch {
-            throw ClaudeAPIError.decodingError(error)
+            throw ClaudeAPIError.decodingError(error, body: data)
         }
     }
 
