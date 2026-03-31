@@ -96,30 +96,30 @@ struct MenuBarLabel: View {
         ctx.fillPath()
         ctx.restoreGState()
 
-        // --- Draw usage bar (only when data is available) ---
+        // --- Draw usage bar (always visible; empty when no data) ---
+        let barX = (logoSize + gap) * scale
+        let bw = barWidth * scale
+        let bh = barHeight * scale
+        let barY = (totalHeight - barHeight) / 2 * scale  // vertically center
+        let cr = cornerRadius * scale
+
+        ctx.saveGState()
+        ctx.translateBy(x: barX, y: barY)
+
+        // Track background
+        let trackRect = CGRect(x: 0, y: 0, width: bw, height: bh)
+        let trackPath = CGPath(roundedRect: trackRect, cornerWidth: cr, cornerHeight: cr, transform: nil)
+        ctx.setFillColor(NSColor.gray.withAlphaComponent(0.3).cgColor)
+        ctx.addPath(trackPath)
+        ctx.fillPath()
+
+        // Outline
+        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.3).cgColor)
+        ctx.setLineWidth(1 * scale)
+        ctx.addPath(trackPath)
+        ctx.strokePath()
+
         if poller.usage != nil {
-            let barX = (logoSize + gap) * scale
-            let bw = barWidth * scale
-            let bh = barHeight * scale
-            let barY = (totalHeight - barHeight) / 2 * scale  // vertically center
-            let cr = cornerRadius * scale
-
-            ctx.saveGState()
-            ctx.translateBy(x: barX, y: barY)
-
-            // Track background
-            let trackRect = CGRect(x: 0, y: 0, width: bw, height: bh)
-            let trackPath = CGPath(roundedRect: trackRect, cornerWidth: cr, cornerHeight: cr, transform: nil)
-            ctx.setFillColor(NSColor.gray.withAlphaComponent(0.3).cgColor)
-            ctx.addPath(trackPath)
-            ctx.fillPath()
-
-            // Outline
-            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.3).cgColor)
-            ctx.setLineWidth(1 * scale)
-            ctx.addPath(trackPath)
-            ctx.strokePath()
-
             // Usage fill
             let fraction = poller.sessionFraction
             if fraction > 0 {
@@ -141,9 +141,9 @@ struct MenuBarLabel: View {
                 ctx.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
                 ctx.fill(CGRect(x: tickX - tickWidth / 2, y: 0, width: tickWidth, height: bh))
             }
-
-            ctx.restoreGState()
         }
+
+        ctx.restoreGState()
 
         image.unlockFocus()
         image.isTemplate = false
