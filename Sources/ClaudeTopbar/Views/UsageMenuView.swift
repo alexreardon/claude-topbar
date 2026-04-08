@@ -115,6 +115,11 @@ struct UsageMenuView: View {
             if let bucket = usage.sevenDaySonnet {
                 usageLine(label: "Sonnet (7d)", bucket: bucket, windowHours: 7 * 24)
             }
+
+            if let extra = usage.extraUsage, extra.isEnabled == true, extra.percentage != nil {
+                Divider()
+                extraUsageLine(extra)
+            }
         }
     }
 
@@ -156,6 +161,34 @@ struct UsageMenuView: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.yellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func extraUsageLine(_ extra: ExtraUsage) -> some View {
+        let pct = extra.percentage ?? 0
+        let frac = extra.fraction ?? 0
+        let color: Color = pct >= 95 ? .red : pct >= 80 ? .orange : .blue
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text("Extra usage")
+                    .font(.system(.body, weight: .medium))
+                Spacer()
+                Text("\(pct)% used")
+                    .font(.system(.body, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(color)
+            }
+
+            UsageBar(
+                fraction: frac,
+                windowProgress: 0,
+                tint: color
+            )
+
+            if let spent = extra.spentFormatted {
+                Text("\(spent) spent")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
