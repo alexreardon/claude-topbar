@@ -143,9 +143,11 @@ struct UsageMenuView: View {
             )
 
             if let resetsAt = bucket.resetsAtDate {
-                Text("Resets \(resetsAt, style: .relative)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    Text(resetsLabel(resetsAt: resetsAt, now: context.date))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -189,6 +191,34 @@ struct UsageMenuView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func resetsLabel(resetsAt: Date, now: Date) -> String {
+        let timeStr = formatResetTime(resetsAt)
+        let remaining = resetsAt.timeIntervalSince(now)
+        guard remaining > 0 else { return "Resets at \(timeStr)" }
+        let totalMinutes = Int(remaining / 60)
+        let days = totalMinutes / (60 * 24)
+        let hours = (totalMinutes / 60) % 24
+        let minutes = totalMinutes % 60
+        let duration: String
+        if days > 0 {
+            duration = "in \(days) day\(days == 1 ? "" : "s")"
+        } else if hours > 0 {
+            duration = "\(hours)hr \(minutes)min"
+        } else {
+            duration = "\(minutes)min"
+        }
+        return "Resets at \(timeStr) (\(duration))"
+    }
+
+    private func formatResetTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        let minute = Calendar.current.component(.minute, from: date)
+        formatter.dateFormat = minute == 0 ? "ha" : "h:mma"
+        return formatter.string(from: date).lowercased()
     }
 
     private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
