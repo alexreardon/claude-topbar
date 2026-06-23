@@ -24,16 +24,27 @@ final class UsagePoller {
         }
     }
 
+    /// True when this account is governed by a dollar spend limit instead of
+    /// rolling-session buckets (e.g. Enterprise spend limits).
+    var isSpendLimitAccount: Bool {
+        guard let usage else { return false }
+        return usage.fiveHour == nil && usage.sevenDay == nil && usage.spend != nil
+    }
+
     var displayPercentage: Int {
         guard let usage else { return 0 }
-        let session = usage.fiveHour?.percentage ?? 0
-        let weekly = usage.sevenDay?.percentage ?? 0
-        return max(session, weekly)
+        let session = usage.fiveHour?.percentage
+        let weekly = usage.sevenDay?.percentage
+        if session != nil || weekly != nil {
+            return max(session ?? 0, weekly ?? 0)
+        }
+        return usage.spend?.percentage ?? 0
     }
 
     /// Normalized 0.0-1.0 for the menu bar progress bar
     var sessionFraction: Double {
-        usage?.fiveHour?.fraction ?? 0
+        if let fraction = usage?.fiveHour?.fraction { return fraction }
+        return usage?.spend?.fraction ?? 0
     }
 
     var sessionResetsAt: Date? {
