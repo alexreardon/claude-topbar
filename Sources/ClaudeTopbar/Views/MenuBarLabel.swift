@@ -54,9 +54,12 @@ struct MenuBarLabel: View {
     private func usageColor(fraction: Double, percentage: Int) -> NSColor {
         if percentage >= 95 { return .systemRed }
         if percentage >= 80 { return .systemOrange }
-        let wp = currentWindowProgress ?? poller.windowProgress
-        if fraction < wp { return .systemGreen }
-        return .systemOrange
+        // Rolling sessions are paced against a time window; spend limits have no window.
+        if poller.usage?.fiveHour != nil {
+            let wp = currentWindowProgress ?? poller.windowProgress
+            return fraction < wp ? .systemGreen : .systemOrange
+        }
+        return .systemGreen
     }
 
     /// Renders the Claude logo + usage bar as a single NSImage
@@ -128,7 +131,7 @@ struct MenuBarLabel: View {
                 ctx.saveGState()
                 ctx.addPath(trackPath)
                 ctx.clip()
-                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.usage?.fiveHour?.percentage ?? 0).cgColor)
+                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
                 ctx.fill(fillRect)
                 ctx.restoreGState()
             }

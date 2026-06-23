@@ -116,9 +116,25 @@ struct UsageMenuView: View {
                 usageLine(label: "Sonnet (7d)", bucket: bucket, windowHours: 7 * 24)
             }
 
+            // Spend-limit accounts (no rolling-session buckets).
+            if let spend = usage.spend, spend.enabled == true,
+               usage.fiveHour == nil, usage.sevenDay == nil {
+                spendLine(spend)
+            }
+
+            ForEach(usage.creditBuckets) { credit in
+                creditLine(credit)
+            }
+
             if let extra = usage.extraUsage, extra.isEnabled == true, extra.percentage != nil {
                 Divider()
                 extraUsageLine(extra)
+            }
+
+            if !usage.hasDisplayableUsage {
+                Text("No usage limits reported for this account.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -148,6 +164,58 @@ struct UsageMenuView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    private func spendLine(_ spend: SpendInfo) -> some View {
+        let pct = spend.percentage ?? 0
+        let frac = spend.fraction ?? 0
+        let color: Color = pct >= 95 ? .red : pct >= 80 ? .orange : .green
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text("Spend limit")
+                    .font(.system(.body, weight: .medium))
+                Spacer()
+                Text("\(pct)% used")
+                    .font(.system(.body, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(color)
+            }
+
+            UsageBar(fraction: frac, windowProgress: 0, tint: color)
+
+            if let summary = spend.amountSummary {
+                Text("\(summary) spent")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func creditLine(_ credit: CreditBucket) -> some View {
+        let pct = credit.percentage
+        let color: Color = pct >= 95 ? .red : pct >= 80 ? .orange : .blue
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(credit.label)
+                    .font(.system(.body, weight: .medium))
+                Spacer()
+                Text("\(pct)% used")
+                    .font(.system(.body, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(color)
+            }
+
+            UsageBar(fraction: credit.fraction, windowProgress: 0, tint: color)
+
+            if let summary = credit.amountSummary {
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let expires = credit.resetsAtDate {
+                Text("Expires \(formatExpiry(expires))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -219,6 +287,14 @@ struct UsageMenuView: View {
         let minute = Calendar.current.component(.minute, from: date)
         formatter.dateFormat = minute == 0 ? "ha" : "h:mma"
         return formatter.string(from: date).lowercased()
+    }
+
+    private func formatExpiry(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 
     private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
