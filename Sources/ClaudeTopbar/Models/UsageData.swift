@@ -43,6 +43,10 @@ struct UsageResponse: Decodable, Sendable {
     /// Dollar-denominated credit balances (e.g. the Claude Code & Cowork "Included credit").
     /// Keyed by internal codenames that change over time, so we discover them dynamically.
     let creditBuckets: [CreditBucket]
+    /// Per-model weekly caps from the `limits` array (e.g. a weekly limit scoped to
+    /// Fable). This is where per-model weekly data lives now that the top-level
+    /// `seven_day_opus`/`seven_day_sonnet` buckets are being retired.
+    let weeklyScopedLimits: [ScopedLimit]
 
     private struct DynamicKey: CodingKey {
         var stringValue: String
@@ -82,11 +86,16 @@ struct UsageResponse: Decodable, Sendable {
             }
         }
         creditBuckets = credits
+
+        let limits = DynamicKey(stringValue: "limits")
+            .flatMap { (try? container.decodeIfPresent([ScopedLimit].self, forKey: $0)) ?? nil } ?? []
+        weeklyScopedLimits = limits.filter { $0.kind == "weekly_scoped" && $0.modelName != nil }
     }
 
     /// Whether there's anything meaningful to render in the panel.
     var hasDisplayableUsage: Bool {
         fiveHour != nil || sevenDay != nil || sevenDayOpus != nil || sevenDaySonnet != nil
+            || !weeklyScopedLimits.isEmpty
             || (spend?.enabled == true)
             || !creditBuckets.isEmpty
             || (extraUsage?.isEnabled == true && extraUsage?.percentage != nil)
@@ -110,6 +119,12 @@ struct UsageBucket: Codable, Sendable {
         self.resetsAt = try? container.decode(String.self, forKey: .resetsAt)
     }
 
+    /// Build a bucket directly (used to render `limits` entries through the same machinery).
+    init(utilization: Double, resetsAt: String?) {
+        self.utilization = utilization
+        self.resetsAt = resetsAt
+    }
+
     var resetsAtDate: Date? { ISODate.parse(resetsAt) }
 
     /// utilization comes from the API as 0-100 (already a percentage)
@@ -131,6 +146,56 @@ struct UsageBucket: Codable, Sendable {
         guard now >= windowStart else { return 0 }
         guard now < resetsAt else { return 1 }
         return now.timeIntervalSince(windowStart) / windowDuration
+    }
+}
+
+// MARK: - Model-scoped limits (from the `limits` array)
+
+/// One entry in the API's `limits` array. Alongside the top-level `five_hour`/
+/// `seven_day` buckets, the API returns a `limits` array that also carries
+/// per-model weekly caps (`kind == "weekly_scoped"`) — e.g. a weekly limit that
+/// applies only to Fable. See `UsageResponse.weeklyScopedLimits`.
+struct ScopedLimit: Decodable, Sendable, Identifiable {
+    let group: String?
+    let kind: String?
+    let percent: Double?
+    let resetsAt: String?
+    let severity: String?
+    let isActive: Bool?
+    /// Display name of the model this limit is scoped to, e.g. "Fable".
+    let modelName: String?
+
+    var id: String { [kind, modelName].compactMap { $0 }.joined(separator: ":") }
+
+    private enum CodingKeys: String, CodingKey {
+        case group, kind, percent, severity, scope
+        case resetsAt = "resets_at"
+        case isActive = "is_active"
+    }
+
+    private struct Scope: Decodable {
+        struct Model: Decodable {
+            let displayName: String?
+            enum CodingKeys: String, CodingKey { case displayName = "display_name" }
+        }
+        let model: Model?
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        group = try? c.decode(String.self, forKey: .group)
+        kind = try? c.decode(String.self, forKey: .kind)
+        percent = try? c.decode(Double.self, forKey: .percent)
+        resetsAt = try? c.decode(String.self, forKey: .resetsAt)
+        severity = try? c.decode(String.self, forKey: .severity)
+        isActive = try? c.decode(Bool.self, forKey: .isActive)
+        let scope = (try? c.decodeIfPresent(Scope.self, forKey: .scope)) ?? nil
+        modelName = scope?.model?.displayName
+    }
+
+    /// Render through the shared `UsageBucket` machinery (window tick, reset countdown).
+    var bucket: UsageBucket {
+        UsageBucket(utilization: percent ?? 0, resetsAt: resetsAt)
     }
 }
 

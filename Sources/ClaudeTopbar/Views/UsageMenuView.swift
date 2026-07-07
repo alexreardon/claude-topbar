@@ -116,6 +116,14 @@ struct UsageMenuView: View {
                 usageLine(label: "Sonnet (7d)", bucket: bucket, windowHours: 7 * 24)
             }
 
+            // Per-model weekly caps (e.g. Fable). The API delivers these via the
+            // `limits` array now rather than dedicated top-level buckets.
+            ForEach(usage.weeklyScopedLimits) { limit in
+                if let name = limit.modelName, !isShownByLegacyBucket(name, usage: usage) {
+                    usageLine(label: "\(name) (7d)", bucket: limit.bucket, windowHours: 7 * 24)
+                }
+            }
+
             // Spend-limit accounts (no rolling-session buckets).
             if let spend = usage.spend, spend.enabled == true,
                usage.fiveHour == nil, usage.sevenDay == nil {
@@ -295,6 +303,14 @@ struct UsageMenuView: View {
         formatter.timeZone = .current
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
+    }
+
+    /// Avoid double-rendering a model that a legacy top-level bucket already covers.
+    private func isShownByLegacyBucket(_ modelName: String, usage: UsageResponse) -> Bool {
+        let lower = modelName.lowercased()
+        if usage.sevenDayOpus != nil, lower.contains("opus") { return true }
+        if usage.sevenDaySonnet != nil, lower.contains("sonnet") { return true }
+        return false
     }
 
     private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
