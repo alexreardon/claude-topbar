@@ -53,10 +53,16 @@ struct WebLoginWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = WKWebView(
+            frame: NSRect(x: 0, y: 0, width: 500, height: 650),
+            configuration: config
+        )
         webView.navigationDelegate = context.coordinator
         let url = URL(string: "https://claude.ai/login")!
-        webView.load(URLRequest(url: url))
+        // Defer the load until after SwiftUI's first layout pass so the SPA
+        // renders against the real 500x650 viewport rather than a 0x0 one
+        // (loading at zero size shows a blank page until a manual refresh).
+        DispatchQueue.main.async { webView.load(URLRequest(url: url)) }
         return webView
     }
 
