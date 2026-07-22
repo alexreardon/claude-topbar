@@ -20,5 +20,12 @@
       "Bash(git checkout -- .:*)",
       "Bash(git branch -D:*)"
     ]
+  },
+  "sandbox": {
+    "excludedCommands": [
+      "make",
+      "swift",
+      "git"
+    ]
   }
 }
