@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "*",
       "Bash(sw_vers)",
       "Bash(swift:*)",
       "Bash(xcodebuild:*)",
