@@ -6,6 +6,14 @@ struct ClaudeTopbarApp: App {
     @State private var poller = UsagePoller()
     @Environment(\.openWindow) private var openWindow
 
+    // Runs before any scene is built, so a second instance adds no menu bar icon.
+    init() {
+        guard SingleInstance.acquire() else {
+            FileHandle.standardError.write(Data("ClaudeTopbar is already running.\n".utf8))
+            exit(0)
+        }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             UsageMenuView(
