@@ -272,20 +272,10 @@ struct UsageMenuView: View {
     private func resetsLabel(resetsAt: Date, now: Date) -> String {
         let timeStr = formatResetTime(resetsAt)
         let remaining = resetsAt.timeIntervalSince(now)
-        guard remaining > 0 else { return "Resets at \(timeStr)" }
-        let totalMinutes = Int(remaining / 60)
-        let days = totalMinutes / (60 * 24)
-        let hours = (totalMinutes / 60) % 24
-        let minutes = totalMinutes % 60
-        let duration: String
-        if days > 0 {
-            duration = "in \(days) day\(days == 1 ? "" : "s")"
-        } else if hours > 0 {
-            duration = "\(hours)hr \(minutes)min"
-        } else {
-            duration = "\(minutes)min"
-        }
-        return "Resets at \(timeStr) (\(duration))"
+        let usesDays = remaining > 24 * 3600
+        let amount = max(0, Int(ceil(remaining / (usesDays ? 24 * 3600 : 3600))))
+        let unit = usesDays ? "day" : "hour"
+        return "Resets \(timeStr) (in \(amount) \(unit)\(amount == 1 ? "" : "s"))"
     }
 
     private func formatResetTime(_ date: Date) -> String {
@@ -293,8 +283,10 @@ struct UsageMenuView: View {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .current
         let minute = Calendar.current.component(.minute, from: date)
-        formatter.dateFormat = minute == 0 ? "ha" : "h:mma"
-        return formatter.string(from: date).lowercased()
+        formatter.dateFormat = minute == 0 ? "EEEE 'at' ha" : "EEEE 'at' h:mma"
+        formatter.amSymbol = "am"
+        formatter.pmSymbol = "pm"
+        return formatter.string(from: date)
     }
 
     private func formatExpiry(_ date: Date) -> String {
