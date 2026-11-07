@@ -2,9 +2,9 @@
 
 > This project was built with [Claude](https://claude.ai).
 
-A macOS menu bar app that shows your Claude session usage without needing to open the browser.
+A macOS menu bar app that shows your Claude usage without needing to open the browser.
 
-Displays a usage bar, a tick marker for your position in the 5-hour session window, and the time remaining until reset. Click for a full breakdown of session, weekly, and per-model usage.
+Displays a usage bar, a tick marker for your position in the usage window, and the time remaining until reset. By default the bar follows your overall limit that is closest to its cap (for most plans, the weekly limit). You can pin a different limit in Settings. Click for a full breakdown of session, weekly, and per-model usage.
 
 The bar is **green** when usage is below your time position, **orange** when above, and **red** past 95%.
 

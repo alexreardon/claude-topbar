@@ -103,30 +103,14 @@ struct UsageMenuView: View {
     @ViewBuilder
     private func usageSection(_ usage: UsageResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let bucket = usage.fiveHour {
-                usageLine(label: "Session (5h)", bucket: bucket, windowHours: 5)
-            }
-            if let bucket = usage.sevenDay {
-                usageLine(label: "Weekly (7d)", bucket: bucket, windowHours: 7 * 24)
-            }
-            if let bucket = usage.sevenDayOpus {
-                usageLine(label: "Opus (7d)", bucket: bucket, windowHours: 7 * 24)
-            }
-            if let bucket = usage.sevenDaySonnet {
-                usageLine(label: "Sonnet (7d)", bucket: bucket, windowHours: 7 * 24)
+            // Session, weekly, and per-model limits (e.g. Fable), whatever the API reports.
+            let menuBarLimitID = poller.menuBarLimit?.id
+            ForEach(usage.rollingLimits) { limit in
+                usageLine(limit, inMenuBar: limit.id == menuBarLimitID)
             }
 
-            // Per-model weekly caps (e.g. Fable). The API delivers these via the
-            // `limits` array now rather than dedicated top-level buckets.
-            ForEach(usage.weeklyScopedLimits) { limit in
-                if let name = limit.modelName, !isShownByLegacyBucket(name, usage: usage) {
-                    usageLine(label: "\(name) (7d)", bucket: limit.bucket, windowHours: 7 * 24)
-                }
-            }
-
-            // Spend-limit accounts (no rolling-session buckets).
-            if let spend = usage.spend, spend.enabled == true,
-               usage.fiveHour == nil, usage.sevenDay == nil {
+            // Spend-limit accounts (no rolling limits).
+            if usage.rollingLimits.isEmpty, let spend = usage.spend, spend.enabled == true {
                 spendLine(spend)
             }
 
@@ -147,13 +131,20 @@ struct UsageMenuView: View {
         }
     }
 
-    private func usageLine(label: String, bucket: UsageBucket, windowHours: Double) -> some View {
-        let wp = bucket.windowProgress(windowHours: windowHours)
-        let color = usageColor(fraction: bucket.fraction, percentage: bucket.percentage, windowProgress: wp)
+    private func usageLine(_ limit: UsageLimit, inMenuBar: Bool) -> some View {
+        let bucket = limit.bucket
+        let wp = limit.windowProgress
+        let color = usageColor(for: limit, windowProgress: wp)
         return VStack(alignment: .leading, spacing: 3) {
-            HStack {
-                Text(label)
+            HStack(spacing: 4) {
+                Text(limit.label)
                     .font(.system(.body, weight: .medium))
+                if inMenuBar {
+                    Image(systemName: "menubar.rectangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Shown in the menu bar")
+                }
                 Spacer()
                 Text("\(bucket.percentage)% used")
                     .font(.system(.body, weight: .semibold).monospacedDigit())
@@ -297,19 +288,12 @@ struct UsageMenuView: View {
         return formatter.string(from: date)
     }
 
-    /// Avoid double-rendering a model that a legacy top-level bucket already covers.
-    private func isShownByLegacyBucket(_ modelName: String, usage: UsageResponse) -> Bool {
-        let lower = modelName.lowercased()
-        if usage.sevenDayOpus != nil, lower.contains("opus") { return true }
-        if usage.sevenDaySonnet != nil, lower.contains("sonnet") { return true }
-        return false
-    }
-
-    private func usageColor(fraction: Double, percentage: Int, windowProgress: Double) -> Color {
-        if percentage >= 95 { return .red }
-        if percentage >= 80 { return .orange }
-        if fraction < windowProgress { return .green }
-        return .orange
+    private func usageColor(for limit: UsageLimit, windowProgress: Double) -> Color {
+        switch limit.level(windowProgress: windowProgress) {
+        case .normal: return .green
+        case .warning: return .orange
+        case .critical: return .red
+        }
     }
 }
 

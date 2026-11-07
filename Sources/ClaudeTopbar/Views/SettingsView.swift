@@ -78,6 +78,31 @@ struct SettingsView: View {
     private var displaySection: some View {
         Toggle("Start on login", isOn: $startOnLogin)
         Toggle("Show time remaining in menu bar", isOn: Bindable(poller).showTimeInMenuBar)
+
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("Menu bar shows", selection: Bindable(poller).menuBarLimitID) {
+                Text("Automatic").tag(UsagePoller.automaticLimitID)
+                ForEach(availableLimits) { limit in
+                    Text(limit.label).tag(limit.id)
+                }
+                // Keep a pinned limit selectable while the API does not report it.
+                if !isPinnedLimitAvailable {
+                    Text("Not reported (using Automatic)").tag(poller.menuBarLimitID)
+                }
+            }
+            Text("Automatic shows the overall limit closest to its cap — usually weekly.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var availableLimits: [UsageLimit] {
+        poller.usage?.rollingLimits ?? []
+    }
+
+    private var isPinnedLimitAvailable: Bool {
+        poller.menuBarLimitID == UsagePoller.automaticLimitID
+            || availableLimits.contains { $0.id == poller.menuBarLimitID }
     }
 
     @State private var startOnLogin: Bool = SMAppService.mainApp.status == .enabled {

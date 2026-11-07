@@ -33,20 +33,17 @@ func formatUSD(_ dollars: Double) -> String {
 // MARK: - Usage response
 
 struct UsageResponse: Decodable, Sendable {
-    let fiveHour: UsageBucket?
-    let sevenDay: UsageBucket?
-    let sevenDayOpus: UsageBucket?
-    let sevenDaySonnet: UsageBucket?
+    /// Every rolling limit the API reports (session, weekly, per-model, ...), in
+    /// display order. Built from the `limits` array, with the legacy top-level
+    /// buckets (`five_hour`, `seven_day`, ...) filling any gaps. The API has moved
+    /// limits around before, so nothing else reads the raw buckets.
+    let rollingLimits: [UsageLimit]
     let extraUsage: ExtraUsage?
     /// Present on accounts governed by a dollar spend limit instead of rolling sessions.
     let spend: SpendInfo?
     /// Dollar-denominated credit balances (e.g. the Claude Code & Cowork "Included credit").
     /// Keyed by internal codenames that change over time, so we discover them dynamically.
     let creditBuckets: [CreditBucket]
-    /// Per-model weekly caps from the `limits` array (e.g. a weekly limit scoped to
-    /// Fable). This is where per-model weekly data lives now that the top-level
-    /// `seven_day_opus`/`seven_day_sonnet` buckets are being retired.
-    let weeklyScopedLimits: [ScopedLimit]
 
     private struct DynamicKey: CodingKey {
         var stringValue: String
@@ -69,10 +66,27 @@ struct UsageResponse: Decodable, Sendable {
             return try? container.decodeIfPresent(UsageBucket.self, forKey: codingKey)
         }
 
-        fiveHour = bucket("five_hour")
-        sevenDay = bucket("seven_day")
-        sevenDayOpus = bucket("seven_day_opus")
-        sevenDaySonnet = bucket("seven_day_sonnet")
+        var limits: [UsageLimit] = []
+        func add(_ limit: UsageLimit) {
+            if !limits.contains(where: { $0.covers(limit) }) { limits.append(limit) }
+        }
+        // The `limits` array is the current source and names model-scoped caps.
+        let entries = DynamicKey(stringValue: "limits")
+            .flatMap { (try? container.decodeIfPresent([LimitEntry].self, forKey: $0)) ?? nil } ?? []
+        entries.compactMap(\.usageLimit).forEach(add)
+        // Legacy top-level buckets fill any gaps.
+        let legacy: [(key: String, group: String, model: String?)] = [
+            ("five_hour", "session", nil),
+            ("seven_day", "weekly", nil),
+            ("seven_day_opus", "weekly", "Opus"),
+            ("seven_day_sonnet", "weekly", "Sonnet"),
+        ]
+        for (key, group, model) in legacy {
+            guard let b = bucket(key) else { continue }
+            add(UsageLimit(group: group, model: model, utilization: b.utilization, resetsAt: b.resetsAt))
+        }
+        rollingLimits = UsageLimit.displayOrder(limits)
+
         extraUsage = DynamicKey(stringValue: "extra_usage")
             .flatMap { try? container.decodeIfPresent(ExtraUsage.self, forKey: $0) }
         spend = DynamicKey(stringValue: "spend")
@@ -86,16 +100,35 @@ struct UsageResponse: Decodable, Sendable {
             }
         }
         creditBuckets = credits
+    }
 
-        let limits = DynamicKey(stringValue: "limits")
-            .flatMap { (try? container.decodeIfPresent([ScopedLimit].self, forKey: $0)) ?? nil } ?? []
-        weeklyScopedLimits = limits.filter { $0.kind == "weekly_scoped" && $0.modelName != nil }
+    /// The limit the menu bar shows unless the user pins one: the overall limit
+    /// closest to its cap (for most plans, the weekly limit). Model-scoped caps
+    /// only block one model, so they count only when no overall limit exists.
+    var automaticLimit: UsageLimit? {
+        let overall = rollingLimits.filter { $0.scope == .overall }
+        let candidates = overall.isEmpty ? rollingLimits : overall
+        // On a tie, prefer the longer window: it blocks you for longer.
+        return candidates.max {
+            ($0.bucket.utilization, $0.windowHours ?? 0) < ($1.bucket.utilization, $1.windowHours ?? 0)
+        }
+    }
+
+    /// Spend-limit accounts (e.g. Enterprise) have no rolling limits, so their
+    /// dollar cap is the measure. It has no time window, so it is not paced.
+    var spendLimit: UsageLimit? {
+        guard rollingLimits.isEmpty, let spend, spend.enabled == true, let percent = spend.percent else {
+            return nil
+        }
+        return UsageLimit(
+            id: "spend", label: "Spend limit", scope: .overall,
+            bucket: UsageBucket(utilization: percent, resetsAt: nil), windowHours: nil
+        )
     }
 
     /// Whether there's anything meaningful to render in the panel.
     var hasDisplayableUsage: Bool {
-        fiveHour != nil || sevenDay != nil || sevenDayOpus != nil || sevenDaySonnet != nil
-            || !weeklyScopedLimits.isEmpty
+        !rollingLimits.isEmpty
             || (spend?.enabled == true)
             || !creditBuckets.isEmpty
             || (extraUsage?.isEnabled == true && extraUsage?.percentage != nil)
@@ -149,28 +182,118 @@ struct UsageBucket: Codable, Sendable {
     }
 }
 
-// MARK: - Model-scoped limits (from the `limits` array)
+// MARK: - Rolling limits (normalized)
 
-/// One entry in the API's `limits` array. Alongside the top-level `five_hour`/
-/// `seven_day` buckets, the API returns a `limits` array that also carries
-/// per-model weekly caps (`kind == "weekly_scoped"`) — e.g. a weekly limit that
-/// applies only to Fable. See `UsageResponse.weeklyScopedLimits`.
-struct ScopedLimit: Decodable, Sendable, Identifiable {
+/// One rolling usage limit, normalized from either the `limits` array or a
+/// legacy top-level bucket. The menu bar and the panel both read this shape.
+struct UsageLimit: Identifiable, Sendable {
+    enum Scope: Sendable, Equatable {
+        /// Applies to all usage, e.g. the weekly limit.
+        case overall
+        /// Applies to one model only, e.g. a weekly limit for Fable.
+        case model(String)
+    }
+
+    /// Stable across polls (e.g. "weekly", "weekly:fable"). Saved when the user
+    /// pins a limit to the menu bar.
+    let id: String
+    let label: String
+    let scope: Scope
+    let bucket: UsageBucket
+    /// Length of the rolling window. Nil when unknown or when there is no window.
+    let windowHours: Double?
+
+    /// Pace against time only when both the window and its end are known.
+    var isPaced: Bool { windowHours != nil && bucket.resetsAtDate != nil }
+
+    /// How far through the window we are (0.0 to 1.0); 0 when not paced.
+    var windowProgress: Double {
+        guard let windowHours else { return 0 }
+        return bucket.windowProgress(windowHours: windowHours)
+    }
+
+    enum Level { case normal, warning, critical }
+
+    /// One color rule for every view: thresholds first, then pace against time.
+    func level(windowProgress: Double) -> Level {
+        if bucket.percentage >= 95 { return .critical }
+        if bucket.percentage >= 80 { return .warning }
+        guard isPaced else { return .normal }
+        return bucket.fraction < windowProgress ? .normal : .warning
+    }
+
+    /// True when `other` is the same limit, so it should not show twice.
+    /// Model names are matched loosely ("Opus" vs "Opus 4.8").
+    func covers(_ other: UsageLimit) -> Bool {
+        if id == other.id { return true }
+        guard case .model(let a) = scope, case .model(let b) = other.scope,
+              windowHours == other.windowHours else { return false }
+        let (x, y) = (a.lowercased(), b.lowercased())
+        return x.contains(y) || y.contains(x)
+    }
+
+    /// Overall limits first, shortest window first; then model limits in API order.
+    static func displayOrder(_ limits: [UsageLimit]) -> [UsageLimit] {
+        let overall = limits.enumerated()
+            .filter { $0.element.scope == .overall }
+            .sorted {
+                ($0.element.windowHours ?? .infinity, $0.offset) < ($1.element.windowHours ?? .infinity, $1.offset)
+            }
+            .map(\.element)
+        return overall + limits.filter { $0.scope != .overall }
+    }
+}
+
+extension UsageLimit {
+    private struct Window {
+        let id: String
+        let title: String
+        let suffix: String
+        let hours: Double
+    }
+
+    /// Window groups we know. Unknown groups still show, just without a pace tick.
+    private static func window(for group: String) -> Window? {
+        switch group.lowercased() {
+        case "session", "five_hour": return Window(id: "session", title: "Session", suffix: "5h", hours: 5)
+        case "daily": return Window(id: "daily", title: "Daily", suffix: "24h", hours: 24)
+        case "weekly", "seven_day": return Window(id: "weekly", title: "Weekly", suffix: "7d", hours: 7 * 24)
+        default: return nil
+        }
+    }
+
+    init(group: String, model: String?, utilization: Double, resetsAt: String?) {
+        let window = Self.window(for: group)
+        let groupID = window?.id ?? group.lowercased()
+        let suffix = window.map { " (\($0.suffix))" } ?? ""
+        if let model {
+            id = "\(groupID):\(model.lowercased())"
+            label = model + suffix
+            scope = .model(model)
+        } else {
+            id = groupID
+            label = (window?.title ?? group.replacingOccurrences(of: "_", with: " ").capitalized) + suffix
+            scope = .overall
+        }
+        bucket = UsageBucket(utilization: utilization, resetsAt: resetsAt)
+        windowHours = window?.hours
+    }
+}
+
+/// One entry in the API's `limits` array, e.g.
+/// `{"kind": "weekly_scoped", "group": "weekly", "percent": 65, "resets_at": ...,
+///   "scope": {"model": {"display_name": "Fable"}}}`.
+private struct LimitEntry: Decodable {
     let group: String?
     let kind: String?
     let percent: Double?
     let resetsAt: String?
-    let severity: String?
-    let isActive: Bool?
     /// Display name of the model this limit is scoped to, e.g. "Fable".
     let modelName: String?
 
-    var id: String { [kind, modelName].compactMap { $0 }.joined(separator: ":") }
-
     private enum CodingKeys: String, CodingKey {
-        case group, kind, percent, severity, scope
+        case group, kind, percent, scope
         case resetsAt = "resets_at"
-        case isActive = "is_active"
     }
 
     private struct Scope: Decodable {
@@ -187,15 +310,14 @@ struct ScopedLimit: Decodable, Sendable, Identifiable {
         kind = try? c.decode(String.self, forKey: .kind)
         percent = try? c.decode(Double.self, forKey: .percent)
         resetsAt = try? c.decode(String.self, forKey: .resetsAt)
-        severity = try? c.decode(String.self, forKey: .severity)
-        isActive = try? c.decode(Bool.self, forKey: .isActive)
         let scope = (try? c.decodeIfPresent(Scope.self, forKey: .scope)) ?? nil
         modelName = scope?.model?.displayName
     }
 
-    /// Render through the shared `UsageBucket` machinery (window tick, reset countdown).
-    var bucket: UsageBucket {
-        UsageBucket(utilization: percent ?? 0, resetsAt: resetsAt)
+    var usageLimit: UsageLimit? {
+        // Prefer `group`; else take it from `kind` ("weekly_all" -> "weekly").
+        guard let group = group ?? kind?.split(separator: "_").first.map(String.init) else { return nil }
+        return UsageLimit(group: group, model: modelName, utilization: percent ?? 0, resetsAt: resetsAt)
     }
 }
 
@@ -342,8 +464,8 @@ struct CreditBucket: Sendable, Identifiable {
 
 struct ExtraUsage: Codable, Sendable {
     let utilization: Double?
-    let monthlyLimit: Int?
-    let usedCredits: Int?
+    let monthlyLimit: Double?
+    let usedCredits: Double?
     let isEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -356,8 +478,8 @@ struct ExtraUsage: Codable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.utilization = try? container.decode(Double.self, forKey: .utilization)
-        self.monthlyLimit = try? container.decode(Int.self, forKey: .monthlyLimit)
-        self.usedCredits = try? container.decode(Int.self, forKey: .usedCredits)
+        self.monthlyLimit = try? container.decode(Double.self, forKey: .monthlyLimit)
+        self.usedCredits = try? container.decode(Double.self, forKey: .usedCredits)
         self.isEnabled = try? container.decode(Bool.self, forKey: .isEnabled)
     }
 
@@ -373,12 +495,12 @@ struct ExtraUsage: Codable, Sendable {
 
     var spentDollars: Double? {
         guard let usedCredits else { return nil }
-        return Double(usedCredits) / 100.0
+        return usedCredits / 100.0
     }
 
     var limitDollars: Double? {
         guard let monthlyLimit else { return nil }
-        return Double(monthlyLimit) / 100.0
+        return monthlyLimit / 100.0
     }
 
     var spentFormatted: String? {

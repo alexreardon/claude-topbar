@@ -13,6 +13,13 @@ final class UsagePoller {
         didSet { UserDefaults.standard.set(showTimeInMenuBar, forKey: "showTimeInMenuBar") }
     }
 
+    static let automaticLimitID = "auto"
+
+    /// `automaticLimitID`, or the `UsageLimit.id` the user pinned to the menu bar.
+    var menuBarLimitID: String = UserDefaults.standard.string(forKey: "menuBarLimitID") ?? UsagePoller.automaticLimitID {
+        didSet { UserDefaults.standard.set(menuBarLimitID, forKey: "menuBarLimitID") }
+    }
+
     private var pollTimer: Timer?
     private var cachedOrgId: String?
     private let pollInterval: TimeInterval = 60
@@ -24,36 +31,16 @@ final class UsagePoller {
         }
     }
 
-    /// True when this account is governed by a dollar spend limit instead of
-    /// rolling-session buckets (e.g. Enterprise spend limits).
-    var isSpendLimitAccount: Bool {
-        guard let usage else { return false }
-        return usage.fiveHour == nil && usage.sevenDay == nil && usage.spend != nil
-    }
-
-    var displayPercentage: Int {
-        guard let usage else { return 0 }
-        let session = usage.fiveHour?.percentage
-        let weekly = usage.sevenDay?.percentage
-        if session != nil || weekly != nil {
-            return max(session ?? 0, weekly ?? 0)
+    /// The one limit that drives the menu bar: its fill, color, pace tick, and
+    /// countdown. A pinned limit wins while the API still reports it; otherwise
+    /// the automatic rule picks, then the spend limit for spend-only accounts.
+    var menuBarLimit: UsageLimit? {
+        guard let usage else { return nil }
+        if menuBarLimitID != Self.automaticLimitID,
+           let pinned = usage.rollingLimits.first(where: { $0.id == menuBarLimitID }) {
+            return pinned
         }
-        return usage.spend?.percentage ?? 0
-    }
-
-    /// Normalized 0.0-1.0 for the menu bar progress bar
-    var sessionFraction: Double {
-        if let fraction = usage?.fiveHour?.fraction { return fraction }
-        return usage?.spend?.fraction ?? 0
-    }
-
-    var sessionResetsAt: Date? {
-        usage?.fiveHour?.resetsAtDate
-    }
-
-    /// How far through the 5h window we are (0.0 to 1.0)
-    var windowProgress: Double {
-        usage?.fiveHour?.windowProgress(windowHours: 5) ?? 0
+        return usage.automaticLimit ?? usage.spendLimit
     }
 
     func start() {

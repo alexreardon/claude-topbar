@@ -26,22 +26,23 @@ struct MenuBarLabel: View {
     }
 
     private var timeRemainingLabel: String? {
-        guard let resetsAt = poller.sessionResetsAt else { return nil }
-        let remaining = resetsAt.timeIntervalSinceNow
+        guard let resetsAt = poller.menuBarLimit?.bucket.resetsAtDate else { return nil }
+        let remaining = Int(resetsAt.timeIntervalSinceNow)
         guard remaining > 0 else { return "0m" }
-        let hours = Int(remaining) / 3600
-        let minutes = (Int(remaining) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h\(String(format: "%02d", minutes))m"
-        }
+        let days = remaining / 86400
+        let hours = (remaining % 86400) / 3600
+        let minutes = (remaining % 3600) / 60
+        // Weekly windows run for days, so drop minutes once days show.
+        if days > 0 { return "\(days)d\(hours)h" }
+        if hours > 0 { return "\(hours)h\(String(format: "%02d", minutes))m" }
         return "\(minutes)m"
     }
 
     private func startTickTimer() {
-        if poller.usage != nil { currentWindowProgress = poller.windowProgress }
+        currentWindowProgress = poller.menuBarLimit?.windowProgress
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
-                if poller.usage != nil { currentWindowProgress = poller.windowProgress }
+                currentWindowProgress = poller.menuBarLimit?.windowProgress
             }
         }
     }
@@ -51,15 +52,12 @@ struct MenuBarLabel: View {
         tickTimer = nil
     }
 
-    private func usageColor(fraction: Double, percentage: Int) -> NSColor {
-        if percentage >= 95 { return .systemRed }
-        if percentage >= 80 { return .systemOrange }
-        // Rolling sessions are paced against a time window; spend limits have no window.
-        if poller.usage?.fiveHour != nil {
-            let wp = currentWindowProgress ?? poller.windowProgress
-            return fraction < wp ? .systemGreen : .systemOrange
+    private func usageColor(for limit: UsageLimit, windowProgress: Double) -> NSColor {
+        switch limit.level(windowProgress: windowProgress) {
+        case .normal: return .systemGreen
+        case .warning: return .systemOrange
+        case .critical: return .systemRed
         }
-        return .systemGreen
     }
 
     /// Renders the Claude logo + usage bar as a single NSImage
@@ -122,22 +120,24 @@ struct MenuBarLabel: View {
         ctx.addPath(trackPath)
         ctx.strokePath()
 
-        if poller.usage != nil {
+        // Fill, color, and tick all come from one limit so they always agree.
+        if let limit = poller.menuBarLimit {
+            let progress = currentWindowProgress ?? limit.windowProgress
+
             // Usage fill
-            let fraction = poller.sessionFraction
+            let fraction = limit.bucket.fraction
             if fraction > 0 {
                 let fillWidth = bw * CGFloat(min(fraction, 1.0))
                 let fillRect = CGRect(x: 0, y: 0, width: fillWidth, height: bh)
                 ctx.saveGState()
                 ctx.addPath(trackPath)
                 ctx.clip()
-                ctx.setFillColor(usageColor(fraction: fraction, percentage: poller.displayPercentage).cgColor)
+                ctx.setFillColor(usageColor(for: limit, windowProgress: progress).cgColor)
                 ctx.fill(fillRect)
                 ctx.restoreGState()
             }
 
             // Tick marker for time position
-            let progress = currentWindowProgress ?? poller.windowProgress
             if progress > 0 && progress < 1 {
                 let tickX = bw * CGFloat(progress)
                 let tickWidth: CGFloat = 2 * scale
