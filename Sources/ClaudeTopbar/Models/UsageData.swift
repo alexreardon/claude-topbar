@@ -214,12 +214,28 @@ struct UsageLimit: Identifiable, Sendable {
 
     enum Level { case normal, warning, critical }
 
-    /// One color rule for every view: thresholds first, then pace against time.
+    /// How far usage may run past the tick and still count as on pace. Without it,
+    /// the first prompts after a reset show orange, because the tick starts at 0.
+    private static let paceTolerance = 0.05
+
+    /// One color rule for every view. For a paced limit, the tick decides: usage
+    /// at or behind it will not reach the cap before the reset, at any percentage.
     func level(windowProgress: Double) -> Level {
+        // At the cap you are blocked now, whatever the clock says.
+        if bucket.percentage >= 100 { return .critical }
+
+        // No clock to compare against, so fall back to fixed thresholds.
+        guard isPaced, windowProgress > 0 else {
+            if bucket.percentage >= 95 { return .critical }
+            if bucket.percentage >= 80 { return .warning }
+            return .normal
+        }
+
+        let ahead = bucket.fraction - windowProgress
+        if ahead <= 0 { return .normal }
+        // Ahead of pace and almost out: you will hit the cap soon.
         if bucket.percentage >= 95 { return .critical }
-        if bucket.percentage >= 80 { return .warning }
-        guard isPaced else { return .normal }
-        return bucket.fraction < windowProgress ? .normal : .warning
+        return ahead > Self.paceTolerance ? .warning : .normal
     }
 
     /// True when `other` is the same limit, so it should not show twice.
