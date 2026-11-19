@@ -1,14 +1,8 @@
-# Claude Topbar
+# MacOS Claude Topbar
 
-> This project was built with [Claude](https://claude.ai).
+A MacOS menu bar app that shows your Claude usage
 
-A macOS menu bar app that shows your Claude usage without needing to open the browser.
-
-Displays a usage bar, a tick marker for your position in the usage window, and the time remaining until reset. By default the bar follows your overall limit that is closest to its cap (for most plans, the weekly limit). You can pin a different limit in Settings. Click for a full breakdown of session, weekly, and per-model usage.
-
-The tick sets the color. The bar is **green** when usage is at or behind the tick, at any percentage: at that pace you will not hit the limit before it resets. It is **orange** when usage is more than 5 points ahead of the tick, and **red** when usage is ahead of the tick at 95% or more, or at 100%. Limits with no time window, such as a spend limit, turn orange at 80% and red at 95%.
-
-For Claude Pro and Max plan users.
+<img src="docs/screenshot.png" width="295" alt="Claude Topbar in the macOS menu bar, with its usage panel open">
 
 ## Requirements
 
